@@ -11,6 +11,12 @@ about handling the network protocol, event loops, TCP sockets and more.
 **Note**: If you're viewing this repo on GitHub, head over to
 [codecrafters.io](https://codecrafters.io) to try the challenge.
 
+## Testing
+
+```sh
+codecrafters test
+```
+
 ## Kafka
 
 ### Request message
@@ -40,3 +46,34 @@ Field	Data type	Description
 ```sh
 echo -n "00000023001200046f7fc66100096b61666b612d636c69000a6b61666b612d636c6904302e3100" | xxd -r -p | nc localhost 9092 | hexdump -C
 ```
+
+
+## API Calls
+
+The Kafka protocol defines over 70 different APIs, all of which do different things. Here are some examples:
+
+* Produce writes events to partitions.
+* CreateTopics creates new topics.
+* ApiVersions returns the broker's supported API versions.
+
+A Kafka request specifies the API its calling by using the `request_api_key` header field.
+
+### Message body
+
+The schemas for the request and response bodies are determined by the API being called.
+
+For example, here are some of the fields that the Produce request body contains:
+
+* The name of the topic to write to.
+* The key of the partition to write to.
+* The event data to write.
+
+On the other hand, the `Produce` response body contains a response code for each event. These response codes indicate if the writes succeeded.
+
+### API versioning
+
+Each API supports multiple versions, to allow for different schemas. Here's how API versioning works:
+
+* Requests use the header field request_api_version to specify the API version being requested.
+* Responses always use the same API version as the request. For example, a `Produce Request (Version: 3)` will always get a `Produce Response (Version: 3)` back.
+* Each API's version history is independent. So, different APIs with the same version are unrelated. For example, `Produce Request (Version: 10)` is not related to `Fetch Request (Version: 10)`.

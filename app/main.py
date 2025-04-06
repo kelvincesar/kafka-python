@@ -2,6 +2,8 @@ import socket  # noqa: F401
 import struct
 import signal
 import sys
+from app.kafka_types import RequestMessage, ResponseMessage
+
 
 def handle_sigint(sig, frame):
     print("\nShutting down gracefully...")
@@ -9,11 +11,6 @@ def handle_sigint(sig, frame):
 
 signal.signal(signal.SIGINT, handle_sigint)
 
-def parse_message_header(data: bytes) -> tuple:
-    # > Big endian
-    # I Unsigned int (4 bytes)
-    message_size, _, correlation_id = struct.unpack(">III", data[:12])
-    return message_size, correlation_id
 
 def main() -> None:
     print("Logs from your program will appear here!")
@@ -28,10 +25,10 @@ def main() -> None:
             with conn:
                 print("Connected by", addr)
                 while msg := conn.recv(1024):
-                    message_size, correlation_id = parse_message_header(msg)
-                    response = struct.pack(">II", message_size, correlation_id)
-                    print(f"Received {msg}: {message_size=}, {correlation_id=} ({response})")
-                    conn.sendall(response)
+                    request = RequestMessage.from_bytes(msg)
+                    print(f"Received request: {request}")
+                    response = ResponseMessage.from_request(request)
+                    conn.sendall(response.to_bytes())
                 conn.shutdown(socket.SHUT_WR)
                 conn.close()
 
