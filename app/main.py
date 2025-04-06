@@ -1,12 +1,23 @@
 import socket  # noqa: F401
 import struct
+import signal
+import sys
+
+def handle_sigint(sig, frame):
+    print("\nShutting down gracefully...")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_sigint)
+
+def parse_message_header(data: bytes) -> tuple:
+    # > Big endian
+    # I Unsigned int (4 bytes)
+    message_size, _, correlation_id = struct.unpack(">III", data[:12])
+    return message_size, correlation_id
 
 def main() -> None:
     print("Logs from your program will appear here!")
 
-    MESSAGE_SIZE = 1
-    CORRELATION_ID = 7
-    response = struct.pack(">II", MESSAGE_SIZE, CORRELATION_ID)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("localhost", 9092))
@@ -17,9 +28,12 @@ def main() -> None:
             with conn:
                 print("Connected by", addr)
                 while msg := conn.recv(1024):
-                    print(f"Received {msg} and sending {response}")
+                    message_size, correlation_id = parse_message_header(msg)
+                    response = struct.pack(">II", message_size, correlation_id)
+                    print(f"Received {msg}: {message_size=}, {correlation_id=} ({response})")
                     conn.sendall(response)
-            conn.close()
+                conn.shutdown(socket.SHUT_WR)
+                conn.close()
 
 if __name__ == "__main__":
     main()
