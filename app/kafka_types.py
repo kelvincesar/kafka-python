@@ -3,32 +3,29 @@ import struct
 
 SUPPORTED_VERSION = 4
 UNSUPPORTED_VERSION = 35
-
+HEADER_SIZE = 8
 
 @dataclass
 class RequestMessage:
-    message_size: int
     api_key: int
     api_version: int
     correlation_id: int
+    client_id: str
 
     @staticmethod
     def from_bytes(data: int) -> "RequestMessage":
-        if len(data) < 12:
+        if len(data) < HEADER_SIZE: 
             raise ValueError("Not enough bytes to parse RequestMessage")
         
-        # '>' Big endian
-        # 'I' Unsigned int (4 bytes)
-        # 'H' Unsigned short (2 bytes)
-        message_size = struct.unpack(">I", data[:4])[0]
-        api_key = struct.unpack(">H", data[4:6])[0]
-        api_version = struct.unpack(">H", data[6:8])[0]
-        correlation_id = struct.unpack(">I", data[8:12])[0]
+        api_key = int.from_bytes(data[:2], byteorder="big", signed=True)
+        api_version = int.from_bytes(data[2:4], byteorder="big", signed=True)
+        correlation_id = int.from_bytes(data[4:HEADER_SIZE], byteorder="big", signed=True)
+        client_id =  bytes.decode(data[HEADER_SIZE:], "utf-8")
 
-        return RequestMessage(message_size, api_key, api_version, correlation_id)
+        return RequestMessage(api_key, api_version, correlation_id, client_id)
     
     def check_version_error_code(self, supported_version: int) -> int:
-        if self.api_version == supported_version:
+        if self.api_version in [0, 1, 2, 3, 4]:
             return 0
         return UNSUPPORTED_VERSION
     
@@ -37,24 +34,38 @@ class RequestMessage:
 
 @dataclass
 class ResponseMessage:
-    message_size: int = 0
     correlation_id: int = 0
     error_code: int = 0
+    api_key: int = 0
 
     @staticmethod
     def from_request(request: RequestMessage) -> "ResponseMessage":
         return ResponseMessage(
-            message_size=request.message_size,
             correlation_id=request.correlation_id,
-            error_code=request.check_version_error_code(SUPPORTED_VERSION)
+            error_code=request.check_version_error_code(SUPPORTED_VERSION),
+            api_key=request.api_key
         )
     
     
     def to_bytes(self) -> bytes:
-        
-        return struct.pack(
-            ">IIH",
-            self.message_size,
-            self.correlation_id,
-            self.error_code,
+        min_version = 0
+        max_version = 4
+        num_of_api_keys = 2
+        throttle_time_ms = 0
+        tag_buffer = b'\x00'
+
+        body = (
+            self.correlation_id.to_bytes(4, byteorder="big", signed=True) +
+            self.error_code.to_bytes(2, byteorder="big", signed=True) +
+            num_of_api_keys.to_bytes(1, byteorder="big", signed=True) +
+            self.api_key.to_bytes(2, byteorder="big", signed=True) +
+            min_version.to_bytes(2, byteorder="big", signed=True) +
+            max_version.to_bytes(2, byteorder="big", signed=True) +
+            tag_buffer +
+            throttle_time_ms.to_bytes(4, byteorder="big", signed=True) +
+            tag_buffer
         )
+
+        message_size = len(body).to_bytes(4, byteorder="big", signed=True)
+        
+        return message_size + body

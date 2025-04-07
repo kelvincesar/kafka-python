@@ -2,7 +2,7 @@ import socket  # noqa: F401
 import struct
 import signal
 import sys
-from app.kafka_types import RequestMessage, ResponseMessage
+from app.kafka_types import RequestMessage, ResponseMessage, HEADER_SIZE
 
 
 def handle_sigint(sig, frame):
@@ -11,6 +11,8 @@ def handle_sigint(sig, frame):
 
 signal.signal(signal.SIGINT, handle_sigint)
 
+def parse_message_size(header: bytes) -> int:
+    return int.from_bytes(header, byteorder='big', signed=False)
 
 def main() -> None:
     print("Logs from your program will appear here!")
@@ -24,9 +26,17 @@ def main() -> None:
             conn, addr = s.accept()
             with conn:
                 print("Connected by", addr)
-                while msg := conn.recv(1024):
-                    request = RequestMessage.from_bytes(msg)
+                while header := conn.recv(4):
+                    # check for the message size
+                    msg_len = parse_message_size(header)
+                    print(f"Message length: {msg_len}")
+
+                    # wait for the rest of the message
+                    payload = conn.recv(msg_len + HEADER_SIZE)
+                    request = RequestMessage.from_bytes(payload)
                     print(f"Received request: {request}")
+
+                    # build the response
                     response = ResponseMessage.from_request(request)
                     conn.sendall(response.to_bytes())
                 conn.shutdown(socket.SHUT_WR)
