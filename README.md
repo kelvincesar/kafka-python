@@ -1,5 +1,3 @@
-[![progress-banner](https://backend.codecrafters.io/progress/kafka/5d77fb0e-d56c-4c8a-9b9a-7b81dc48ead4)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
-
 This is a starting point for Python solutions to the
 ["Build Your Own Kafka" Challenge](https://codecrafters.io/challenges/kafka).
 
@@ -45,6 +43,12 @@ Field	Data type	Description
 
 ```sh
 echo -n "00000023001200046f7fc66100096b61666b612d636c69000a6b61666b612d636c6904302e3100" | xxd -r -p | nc localhost 9092 | hexdump -C
+```
+
+```sh
+ echo -n "0000002300120004721d01b200096b61666b612d636c69000a6b61666b612d636c6904302e3100" \
+  | xxd -r -p \
+  | nc localhost 9092 | hexdump -C
 ```
 
 
