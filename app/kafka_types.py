@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import struct
 
 SUPPORTED_VERSION = 4
 UNSUPPORTED_VERSION = 35
