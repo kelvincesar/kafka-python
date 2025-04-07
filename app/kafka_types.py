@@ -28,39 +28,69 @@ class RequestMessage:
             return 0
         return UNSUPPORTED_VERSION
     
-    
 
+@dataclass
+class KafkaKey:
+    api_key: int
+    min_version: int
+    max_version: int
+
+@dataclass
+class KeyApiVersions(KafkaKey):
+    def __init__(self, api_key: int = 18):
+        super().__init__(api_key, min_version=0, max_version=4)
+
+@dataclass
+class KeyDescribeTopicPartitions(KafkaKey):
+    def __init__(self, api_key: int = 75):
+        super().__init__(api_key, min_version=0, max_version=0)
+    
+SUPPORTED_KEYS: dict[int, KafkaKey] = {
+    18: KeyApiVersions(),
+    75: KeyDescribeTopicPartitions()
+}
 
 @dataclass
 class ResponseMessage:
+    keys: list[KafkaKey]
     correlation_id: int = 0
     error_code: int = 0
-    api_key: int = 0
 
     @staticmethod
     def from_request(request: RequestMessage) -> "ResponseMessage":
+        kafka_key = SUPPORTED_KEYS.get(request.api_key)
+
+        if kafka_key is None:
+            raise ValueError(f"Unsupported API key: {request.api_key}")
+        print(list(SUPPORTED_KEYS.values()))
+
         return ResponseMessage(
             correlation_id=request.correlation_id,
             error_code=request.check_version_error_code(SUPPORTED_VERSION),
-            api_key=request.api_key
+            keys=list(SUPPORTED_KEYS.values()),
         )
     
     
     def to_bytes(self) -> bytes:
-        min_version = 0
-        max_version = 4
-        num_of_api_keys = 2
         throttle_time_ms = 0
         tag_buffer = b'\x00'
-
+        
+        api_keys_bytes = b""
+        for key in self.keys:
+            print("Key:", key.api_key)
+            api_keys_bytes += key.api_key.to_bytes(2, "big", signed=True)
+            api_keys_bytes += key.min_version.to_bytes(2, "big", signed=True)
+            api_keys_bytes += key.max_version.to_bytes(2, "big", signed=True)
+            api_keys_bytes += tag_buffer
+            
+           
+        num_of_api_keys = (len(self.keys) + 1).to_bytes(1, byteorder="big", signed=True)
+        print(f"Number of API keys: {num_of_api_keys}")
         body = (
             self.correlation_id.to_bytes(4, byteorder="big", signed=True) +
             self.error_code.to_bytes(2, byteorder="big", signed=True) +
-            num_of_api_keys.to_bytes(1, byteorder="big", signed=True) +
-            self.api_key.to_bytes(2, byteorder="big", signed=True) +
-            min_version.to_bytes(2, byteorder="big", signed=True) +
-            max_version.to_bytes(2, byteorder="big", signed=True) +
-            tag_buffer +
+            num_of_api_keys +
+            api_keys_bytes +
             throttle_time_ms.to_bytes(4, byteorder="big", signed=True) +
             tag_buffer
         )

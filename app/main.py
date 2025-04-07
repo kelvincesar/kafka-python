@@ -22,14 +22,17 @@ def handle_connection(conn: socket.socket, addr: str) -> None:
             msg_len = parse_message_size(header)
             print(f"Message length: {msg_len}")
 
-            # wait for the rest of the message
-            payload = conn.recv(msg_len + HEADER_SIZE)
-            request = RequestMessage.from_bytes(payload)
-            print(f"Received request: {request}")
+            try:
+                # wait for the rest of the message
+                payload = conn.recv(msg_len + HEADER_SIZE)
+                request = RequestMessage.from_bytes(payload)
+                print(f"Received request: {request}")
 
-            # build the response
-            response = ResponseMessage.from_request(request)
-            conn.sendall(response.to_bytes())
+                # build the response
+                response = ResponseMessage.from_request(request)
+                conn.sendall(response.to_bytes())
+            except Exception as e:
+                print(f"Error processing request: {request}, {e}")
         conn.shutdown(socket.SHUT_WR)
         conn.close()
 
